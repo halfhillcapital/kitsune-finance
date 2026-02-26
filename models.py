@@ -51,3 +51,13 @@ class EarningsCalendarItem(BaseModel):
     surprise_pct: float | None = None
 
 
+class EconomicsCalendarItem(BaseModel):
+    time: str | None = None
+    currency: str | None = None
+    impact: str | None = None
+    event: str | None = None
+    actual: str | None = None
+    forecast: str | None = None
+    previous: str | None = None
+
+

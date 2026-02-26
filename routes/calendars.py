@@ -1,43 +1,39 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date
 
 from fastapi import APIRouter, Query
 
-from models import EarningsCalendarItem
-from storage import calendar_path, read_json
+from models import EarningsCalendarItem, EconomicsCalendarItem
+from storage import read_earnings_calendar, read_economics_calendar
 
 router = APIRouter(prefix="/calendar")
 
+_DAY_FMT = "%A, %m/%d/%Y"
+
 
 @router.get("/earnings", response_model=dict[str, dict[str, list[EarningsCalendarItem]]])
-def get_earnings_calendar(
-    start: str | None = Query(None, description="Start date YYYY-MM-DD"),
-    end: str | None = Query(None, description="End date YYYY-MM-DD"),
+async def get_earnings_calendar(
+    start: date | None = Query(None, description="Start date YYYY-MM-DD"),
+    end: date | None = Query(None, description="End date YYYY-MM-DD"),
 ):
-    data = read_json(calendar_path("earnings")) or {}
-    if isinstance(data, list):
-        data = {}  # guard against old flat-list format
-
-    def _parse_day(companies: dict) -> dict[str, list[EarningsCalendarItem]]:
-        return {
+    data = await read_earnings_calendar(start=start, end=end)
+    return {
+        day.strftime(_DAY_FMT): {
             company: [EarningsCalendarItem(**i) for i in items]
             for company, items in companies.items()
         }
-
-    if not start and not end:
-        return {day: _parse_day(companies) for day, companies in data.items()}
-    filtered: dict[str, dict[str, list[EarningsCalendarItem]]] = {}
-    for day, companies in data.items():
-        try:
-            dt = datetime.strptime(day, "%A, %m/%d/%Y")
-        except ValueError:
-            continue
-        if start and dt < datetime.fromisoformat(start):
-            continue
-        if end and dt > datetime.fromisoformat(end):
-            continue
-        filtered[day] = _parse_day(companies)
-    return filtered
+        for day, companies in data.items()
+    }
 
 
+@router.get("/economics", response_model=dict[str, list[EconomicsCalendarItem]])
+async def get_economics_calendar(
+    start: date | None = Query(None, description="Start date YYYY-MM-DD"),
+    end: date | None = Query(None, description="End date YYYY-MM-DD"),
+):
+    data = await read_economics_calendar(start=start, end=end)
+    return {
+        day.strftime(_DAY_FMT): [EconomicsCalendarItem(**e) for e in events]
+        for day, events in data.items()
+    }

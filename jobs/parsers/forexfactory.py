@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date, datetime
+
 from lxml import html
 from lxml.html import tostring
 
@@ -39,6 +41,24 @@ def extract_calendar_table(page_html: str) -> str:
     return str(tostring(tables[0], encoding="unicode"))
 
 
+def _resolve_date(raw: str) -> date:
+    """Parse a ForexFactory date like 'Thu Feb 26' into a date with correct year.
+
+    ForexFactory doesn't include the year, so we infer it: if the resulting date
+    is more than 3 months in the future, it's probably last year; if more than
+    9 months in the past, it's probably next year.
+    """
+    parsed = datetime.strptime(raw, "%a %b %d").date()
+    today = date.today()
+    candidate = parsed.replace(year=today.year)
+    delta = (candidate - today).days
+    if delta > 90:
+        candidate = candidate.replace(year=today.year - 1)
+    elif delta < -270:
+        candidate = candidate.replace(year=today.year + 1)
+    return candidate
+
+
 def parse_economic_calendar(raw_html: str) -> list[dict]:
     """Parse a ForexFactory economic-calendar HTML table into a flat list.
 
@@ -49,14 +69,16 @@ def parse_economic_calendar(raw_html: str) -> list[dict]:
     rows = doc.xpath('//tr[@data-event-id]')
 
     events: list[dict] = []
-    current_date: str | None = None
+    current_date: date | None = None
     current_time: str | None = None
 
     for row in rows:
         # --- date (only present on first row of each day) ---
         date_td = row.find_class("calendar__date")
         if date_td:
-            current_date = _text(date_td[0])
+            raw = _text(date_td[0])
+            if raw:
+                current_date = _resolve_date(raw)
 
         # --- time (empty means same as previous row) ---
         time_td = row.find_class("calendar__time")

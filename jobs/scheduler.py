@@ -6,8 +6,9 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 from apscheduler import AsyncScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 
+from database import close_db, init_db
 from jobs.fetch_calendars import sync_all_calendars
 from jobs.fetch_stock import sync_all_stocks
 
@@ -21,12 +22,14 @@ log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[dict]:
+    await init_db()
+
     async with AsyncScheduler() as scheduler:
         await scheduler.add_schedule(
-            sync_all_stocks, IntervalTrigger(hours=6), id="sync_stocks"
+            sync_all_stocks, CronTrigger(minute=0), id="sync_stocks"
         )
         await scheduler.add_schedule(
-            sync_all_calendars, IntervalTrigger(hours=6), id="sync_calendars"
+            sync_all_calendars, CronTrigger(minute=0), id="sync_calendars"
         )
 
         # Run initial sync in background so server starts immediately
@@ -37,3 +40,5 @@ async def lifespan(app: FastAPI) -> AsyncIterator[dict]:
         app.state.scheduler = scheduler
         yield {"scheduler": scheduler}
         task.cancel()
+
+    await close_db()

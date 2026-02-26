@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-import time
 from datetime import datetime
 from fractions import Fraction
 from typing import cast
@@ -9,7 +9,7 @@ from typing import cast
 import pandas as pd
 import yfinance as yf
 
-from storage import read_watchlist, stock_path, write_json
+from storage import read_watchlist, write_stock
 
 log = logging.getLogger(__name__)
 
@@ -96,22 +96,22 @@ def fetch_single_stock(ticker: str) -> dict:
     }
 
 
-def sync_single_stock(ticker: str) -> None:
+async def sync_single_stock(ticker: str) -> None:
     """Fetch and persist data for a single ticker."""
     log.info("Syncing stock data for %s", ticker)
     try:
-        data = fetch_single_stock(ticker)
-        write_json(stock_path(ticker), data)
+        data = await asyncio.to_thread(fetch_single_stock, ticker)
+        await write_stock(ticker, data)
         log.info("Synced %s successfully", ticker)
     except Exception:
         log.error("Failed to sync %s", ticker, exc_info=True)
 
 
-def sync_all_stocks() -> None:
+async def sync_all_stocks() -> None:
     """Sync all tickers in the watchlist."""
-    tickers = read_watchlist()
+    tickers = await read_watchlist()
     log.info("Starting stock sync for %d tickers", len(tickers))
     for ticker in tickers:
-        sync_single_stock(ticker)
-        time.sleep(2)
+        await sync_single_stock(ticker)
+        await asyncio.sleep(2)
     log.info("Stock sync complete")
