@@ -44,7 +44,6 @@ CREATE TABLE IF NOT EXISTS stock_splits (
 
 CREATE TABLE IF NOT EXISTS earnings_calendar (
     id            SERIAL PRIMARY KEY,
-    day           DATE NOT NULL,
     company       TEXT,
     symbol        TEXT NOT NULL,
     marketcap     DOUBLE PRECISION,
@@ -58,14 +57,14 @@ CREATE TABLE IF NOT EXISTS earnings_calendar (
 );
 
 CREATE TABLE IF NOT EXISTS economics_calendar (
-    id        SERIAL PRIMARY KEY,
-    day       DATE NOT NULL,
-    time      TEXT,
-    currency  TEXT,
-    impact    TEXT,
-    event     TEXT NOT NULL,
-    actual    TEXT,
-    forecast  TEXT,
-    previous  TEXT,
-    UNIQUE (day, event)
+    id          SERIAL PRIMARY KEY,
+    date        TIMESTAMPTZ,
+    is_all_day  BOOLEAN NOT NULL DEFAULT FALSE,
+    currency    TEXT,
+    impact      TEXT,
+    event       TEXT NOT NULL,
+    actual      TEXT,
+    forecast    TEXT,
+    previous    TEXT,
+    UNIQUE (date, event)
 );

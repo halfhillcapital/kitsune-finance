@@ -136,7 +136,8 @@ async def sync_economics_calendar() -> None:
 
         by_day: dict[date, list[dict]] = {}
         for ev in events:
-            day = _parse_day(ev.get("date"))
+            dt = ev.get("date")
+            day = dt.date() if isinstance(dt, datetime) else _parse_day(dt)
             if day is None:
                 continue
             by_day.setdefault(day, []).append(ev)

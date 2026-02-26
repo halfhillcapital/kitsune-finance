@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time, timezone
+from zoneinfo import ZoneInfo
 
 from lxml import html
 from lxml.html import tostring
+
+_CET = ZoneInfo("Europe/Berlin")
 
 
 _IMPACT_MAP = {
@@ -59,18 +62,34 @@ def _resolve_date(raw: str) -> date:
     return candidate
 
 
+def _parse_time(raw: str | None) -> time | None:
+    """Parse a ForexFactory time like '8:30am' into a time object.
+
+    Returns None for non-time values like 'All Day', 'Tentative', or None.
+    """
+    if not raw:
+        return None
+    raw = raw.strip().lower()
+    for fmt in ("%I:%M%p", "%I:%M %p"):
+        try:
+            return datetime.strptime(raw, fmt).time()
+        except ValueError:
+            continue
+    return None
+
+
 def parse_economic_calendar(raw_html: str) -> list[dict]:
     """Parse a ForexFactory economic-calendar HTML table into a flat list.
 
     Each returned dict contains:
-        date, time, currency, impact, event, actual, forecast, previous
+        date, is_all_day, currency, impact, event, actual, forecast, previous
     """
     doc = html.fromstring(raw_html)
     rows = doc.xpath('//tr[@data-event-id]')
 
     events: list[dict] = []
     current_date: date | None = None
-    current_time: str | None = None
+    current_time_str: str | None = None
 
     for row in rows:
         # --- date (only present on first row of each day) ---
@@ -79,13 +98,14 @@ def parse_economic_calendar(raw_html: str) -> list[dict]:
             raw = _text(date_td[0])
             if raw:
                 current_date = _resolve_date(raw)
+                current_time_str = None  # reset time on new day
 
         # --- time (empty means same as previous row) ---
         time_td = row.find_class("calendar__time")
         if time_td:
             t = _text(time_td[0])
             if t:
-                current_time = t
+                current_time_str = t
 
         # --- currency ---
         cur_td = row.find_class("calendar__currency")
@@ -104,10 +124,23 @@ def parse_economic_calendar(raw_html: str) -> list[dict]:
         forecast = _text(row.find_class("calendar__forecast")[0]) if row.find_class("calendar__forecast") else None
         previous = _text(row.find_class("calendar__previous")[0]) if row.find_class("calendar__previous") else None
 
+        # --- build full datetime ---
+        is_all_day = False
+        event_dt: datetime | None = None
+        if current_date is not None:
+            parsed_time = _parse_time(current_time_str)
+            if parsed_time is None:
+                # "All Day", "Tentative", or missing → midnight UTC + all-day flag
+                is_all_day = True
+                event_dt = datetime.combine(current_date, time.min, tzinfo=timezone.utc)
+            else:
+                # Times from ForexFactory are in CET — convert to UTC
+                event_dt = datetime.combine(current_date, parsed_time, tzinfo=_CET).astimezone(timezone.utc)
+
         events.append(
             {
-                "date": current_date,
-                "time": current_time,
+                "date": event_dt,
+                "is_all_day": is_all_day,
                 "currency": currency,
                 "impact": impact,
                 "event": event_name,

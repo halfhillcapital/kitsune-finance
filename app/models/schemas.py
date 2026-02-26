@@ -52,7 +52,8 @@ class EarningsCalendarItem(BaseModel):
 
 
 class EconomicsCalendarItem(BaseModel):
-    time: str | None = None
+    date: datetime | None = None
+    is_all_day: bool = False
     currency: str | None = None
     impact: str | None = None
     event: str | None = None

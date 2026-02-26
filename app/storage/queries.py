@@ -186,20 +186,22 @@ async def read_earnings_calendar(
     args: list = []
     if start:
         args.append(start)
-        clauses.append(f"day >= ${len(args)}")
+        clauses.append(f"date::date >= ${len(args)}")
     if end:
         args.append(end)
-        clauses.append(f"day <= ${len(args)}")
+        clauses.append(f"date::date <= ${len(args)}")
     sql = (
         "SELECT * FROM earnings_calendar WHERE "
         + " AND ".join(clauses)
-        + " ORDER BY day DESC, id"
+        + " ORDER BY date::date DESC, id"
     )
     async with db.get_pool().acquire() as conn:
         rows = await conn.fetch(sql, *args)
     result: dict[date, dict[str, list[dict]]] = {}
     for r in rows:
-        day = r["day"]
+        day = r["date"].date() if r["date"] else None
+        if day is None:
+            continue
         company = r["company"] or r["symbol"]
         item = {
             "symbol": r["symbol"],
@@ -218,18 +220,17 @@ async def read_earnings_calendar(
 async def write_earnings_calendar(data: dict[date, dict[str, list[dict]]]) -> None:
     async with db.get_pool().acquire() as conn:
         async with conn.transaction():
-            for day, companies in data.items():
+            for _day, companies in data.items():
                 for company, items in companies.items():
                     for item in items:
                         dt = _to_datetime(item.get("date"))
                         await conn.execute(
                             """
                             INSERT INTO earnings_calendar
-                                (day, company, symbol, marketcap, event_name, date, timing,
+                                (company, symbol, marketcap, event_name, date, timing,
                                  eps_estimate, reported_eps, surprise_pct)
-                            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
                             ON CONFLICT (symbol, date) DO UPDATE SET
-                                day = EXCLUDED.day,
                                 company = EXCLUDED.company,
                                 marketcap = COALESCE(EXCLUDED.marketcap, earnings_calendar.marketcap),
                                 event_name = COALESCE(EXCLUDED.event_name, earnings_calendar.event_name),
@@ -238,7 +239,7 @@ async def write_earnings_calendar(data: dict[date, dict[str, list[dict]]]) -> No
                                 reported_eps = COALESCE(EXCLUDED.reported_eps, earnings_calendar.reported_eps),
                                 surprise_pct = COALESCE(EXCLUDED.surprise_pct, earnings_calendar.surprise_pct)
                             """,
-                            day, company, item.get("symbol", ""),
+                            company, item.get("symbol", ""),
                             _to_float(item.get("marketcap")),
                             item.get("event_name"),
                             dt,
@@ -256,21 +257,25 @@ async def read_economics_calendar(
     args: list = []
     if start:
         args.append(start)
-        clauses.append(f"day >= ${len(args)}")
+        clauses.append(f"date::date >= ${len(args)}")
     if end:
         args.append(end)
-        clauses.append(f"day <= ${len(args)}")
+        clauses.append(f"date::date <= ${len(args)}")
     sql = (
         "SELECT * FROM economics_calendar WHERE "
         + " AND ".join(clauses)
-        + " ORDER BY day, id"
+        + " ORDER BY date::date, is_all_day DESC, date, id"
     )
     async with db.get_pool().acquire() as conn:
         rows = await conn.fetch(sql, *args)
     result: dict[date, list[dict]] = {}
     for r in rows:
+        day = r["date"].date() if r["date"] else None
+        if day is None:
+            continue
         item = {
-            "time": r["time"],
+            "date": r["date"].isoformat() if r["date"] else None,
+            "is_all_day": r["is_all_day"],
             "currency": r["currency"],
             "impact": r["impact"],
             "event": r["event"],
@@ -278,33 +283,34 @@ async def read_economics_calendar(
             "forecast": r["forecast"],
             "previous": r["previous"],
         }
-        result.setdefault(r["day"], []).append(item)
+        result.setdefault(day, []).append(item)
     return result
 
 
 async def write_economics_calendar(data: dict[date, list[dict]]) -> None:
     async with db.get_pool().acquire() as conn:
         async with conn.transaction():
-            for day, events in data.items():
+            for _day, events in data.items():
                 for ev in events:
                     event_name = ev.get("event")
                     if not event_name:
                         continue
+                    dt = _to_datetime(ev.get("date"))
                     await conn.execute(
                         """
                         INSERT INTO economics_calendar
-                            (day, time, currency, impact, event, actual, forecast, previous)
+                            (date, is_all_day, currency, impact, event, actual, forecast, previous)
                         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-                        ON CONFLICT (day, event) DO UPDATE SET
-                            time = COALESCE(EXCLUDED.time, economics_calendar.time),
+                        ON CONFLICT (date, event) DO UPDATE SET
+                            is_all_day = EXCLUDED.is_all_day,
                             currency = COALESCE(EXCLUDED.currency, economics_calendar.currency),
                             impact = COALESCE(EXCLUDED.impact, economics_calendar.impact),
                             actual = COALESCE(EXCLUDED.actual, economics_calendar.actual),
                             forecast = COALESCE(EXCLUDED.forecast, economics_calendar.forecast),
                             previous = COALESCE(EXCLUDED.previous, economics_calendar.previous)
                         """,
-                        day,
-                        ev.get("time"),
+                        dt,
+                        ev.get("is_all_day", False),
                         ev.get("currency"),
                         ev.get("impact"),
                         event_name,
