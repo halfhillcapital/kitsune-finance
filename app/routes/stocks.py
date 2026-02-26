@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from jobs.fetch_stock import sync_single_stock
-from models import DividendRecord, EarningsDate, SplitRecord, StockCalendar
-from storage import add_to_watchlist, read_stock
+from app.jobs.fetch_stock import sync_single_stock
+from app.models import DividendRecord, EarningsDate, SplitRecord, StockCalendar
+from app.storage import add_to_watchlist, read_stock
 
 router = APIRouter(prefix="/stocks")
 

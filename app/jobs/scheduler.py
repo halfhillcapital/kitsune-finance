@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING
 from apscheduler import AsyncScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from database import close_db, init_db
-from jobs.fetch_calendars import sync_all_calendars
-from jobs.fetch_stock import sync_all_stocks
+from app.database import close_db, init_db
+from app.jobs.fetch_calendars import sync_all_calendars
+from app.jobs.fetch_stock import sync_all_stocks
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator

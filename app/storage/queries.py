@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date, datetime
 
-import database as db
+import app.database as db
 
 
 async def read_watchlist() -> list[str]:

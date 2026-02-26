@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 import asyncpg
+
+from app.config import DATABASE_URL
 
 log = logging.getLogger(__name__)
 
@@ -18,9 +19,8 @@ def get_pool() -> asyncpg.Pool:
 
 async def init_db() -> None:
     global pool
-    dsn = os.environ.get("DATABASE_URL", "postgresql://kitsune:kitsune@localhost:5432/kitsune")
-    pool = await asyncpg.create_pool(dsn, min_size=2, max_size=10)
-    schema = Path(__file__).with_name("schema.sql").read_text()
+    pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+    schema = (Path(__file__).parent / "sql" / "schema.sql").read_text()
     async with pool.acquire() as conn:
         await conn.execute(schema)
     log.info("Database initialized")

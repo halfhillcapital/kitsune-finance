@@ -20,4 +20,4 @@ COPY --from=builder /app /app
 
 EXPOSE 8011
 
-CMD ["uv", "run", "python", "main.py"]
+CMD ["uv", "run", "python", "-m", "app.main"]

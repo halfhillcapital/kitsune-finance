@@ -3,9 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from jobs.fetch_calendars import sync_all_calendars
-from jobs.fetch_stock import sync_all_stocks, sync_single_stock
-from storage import add_to_watchlist, read_watchlist, remove_from_watchlist
+from app.jobs.fetch_calendars import sync_all_calendars
+from app.jobs.fetch_stock import sync_all_stocks, sync_single_stock
+from app.storage import add_to_watchlist, read_watchlist, remove_from_watchlist
 
 router = APIRouter(prefix="/admin")
 

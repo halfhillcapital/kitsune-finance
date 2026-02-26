@@ -9,7 +9,7 @@ from typing import cast
 import pandas as pd
 import yfinance as yf
 
-from storage import read_watchlist, write_stock
+from app.storage import read_watchlist, write_stock
 
 log = logging.getLogger(__name__)
 

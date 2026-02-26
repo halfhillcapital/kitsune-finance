@@ -8,8 +8,8 @@ import pandas as pd
 import yfinance as yf
 import curl_cffi as curl
 
-from storage import write_earnings_calendar, write_economics_calendar
-from jobs.parsers.forexfactory import extract_calendar_table, parse_economic_calendar
+from app.storage import write_earnings_calendar, write_economics_calendar
+from app.jobs.parsers.forexfactory import extract_calendar_table, parse_economic_calendar
 
 log = logging.getLogger(__name__)
 
